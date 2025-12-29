@@ -40,9 +40,15 @@ echo "Example: 192.168.1.10,192.168.1.11,192.168.1.12"
 read -p "Slave IPs: " SLAVE_IPS
 
 if [ -n "${SLAVE_IPS}" ]; then
-    # Update remote_hosts in jmeter.properties
-    sudo sed -i "s/^remote_hosts=.*/remote_hosts=${SLAVE_IPS}/" "${JMETER_HOME}/bin/jmeter.properties"
-    echo "Updated remote_hosts with: ${SLAVE_IPS}"
+    # Validate IP format (basic validation)
+    if [[ "${SLAVE_IPS}" =~ ^[0-9.,]+$ ]]; then
+        # Update remote_hosts in jmeter.properties
+        sudo sed -i "s/^remote_hosts=.*/remote_hosts=${SLAVE_IPS}/" "${JMETER_HOME}/bin/jmeter.properties"
+        echo "Updated remote_hosts with: ${SLAVE_IPS}"
+    else
+        echo "Error: Invalid IP format. Please use comma-separated IPs (e.g., 192.168.1.10,192.168.1.11)"
+        exit 1
+    fi
 fi
 
 echo ""
