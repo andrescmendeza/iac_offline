@@ -238,3 +238,208 @@ test = new_api_test.jmx
 JMeter lo corre
 
 📌 Nada se “auto-activa”.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1️⃣ Arquitectura final – Master, agentes, slaves y tests
+📍 Infra física / lógica
+┌────────────────────────────┐
+│ Azure DevOps                │
+│  - Pipelines                │
+└────────────┬───────────────┘
+             │
+             ▼
+┌────────────────────────────┐
+│ JMeter Master (.31)         │
+│ - Azure DevOps Agent        │
+│ - JMeter CLI                │
+│ - Scripts ejecución         │
+│ - Workspace de pipelines    │
+└────────────┬───────────────┘
+             │ RMI
+     ┌───────┴────────┐
+     ▼                ▼
+┌─────────────┐  ┌─────────────┐
+│ Slave (.32) │  │ Slave (.33) │
+│ - JMeter    │  │ - JMeter    │
+│ - Java      │  │ - Java      │
+└─────────────┘  └─────────────┘
+
+
+📌 Reglas claras:
+
+El agente vive solo en el master
+
+Los slaves no conocen Azure DevOps
+
+El pipeline controla al master
+
+JMeter no toma decisiones
+
+2️⃣ Flujo de ejecución del pipeline (end-to-end)
+Trigger manual / schedule
+        │
+        ▼
+Stage 1 — Prepare
+  - Checkout repos
+  - Validaciones
+        │
+        ▼
+Stage 2 — Execute Test
+  - Run JMeter
+  - Distributed load
+        │
+        ▼
+Stage 3 — Validate Results
+  - Parse JTL
+  - Apply thresholds
+        │
+        ▼
+Stage 4 — Publish
+  - Artifacts
+  - Metrics (Datadog)
+  - Notifications
+
+
+📌 Pipeline = orquestador total
+
+3️⃣ Estructura del pipeline (stages reales)
+🧩 Stage 1 — Prepare
+
+Objetivo: dejar todo listo y fallar rápido si algo está mal.
+
+Checkout repos
+
+Validar conexión a slaves
+
+Validar parámetros
+
+- stage: Prepare
+  jobs:
+  - job: Precheck
+    steps:
+    - checkout: self
+    - checkout: tests
+    - script: scripts/validate_cluster.sh
+
+🧩 Stage 2 — Execute
+
+Objetivo: ejecutar exactamente UN test.
+
+- stage: Execute
+  jobs:
+  - job: RunJMeter
+    steps:
+    - script: |
+        jmeter -n \
+          -t tests/$(TEST_FILE) \
+          -R $(SLAVES) \
+          -l results/results.jtl \
+          -e -o report/
+
+🧩 Stage 3 — Validate
+
+Objetivo: decidir PASS / FAIL.
+
+Parse .jtl
+
+Evaluar SLAs
+
+Fallar pipeline si no cumple
+
+- stage: Validate
+  jobs:
+  - job: Evaluate
+    steps:
+    - script: python scripts/evaluate_results.py
+
+🧩 Stage 4 — Publish
+
+Objetivo: sacar resultados fuera del pipeline.
+
+Artifacts
+
+Datadog
+
+Slack / Confluence
+
+4️⃣ Estructura del nuevo repositorio (pipelines + config)
+📦 Repo: perf-platform
+perf-platform/
+│
+├─ pipelines/
+│   ├─ performance.yml
+│   ├─ stress.yml
+│   ├─ endurance.yml
+│
+├─ scripts/
+│   ├─ run_jmeter.sh
+│   ├─ validate_cluster.sh
+│   ├─ evaluate_results.py
+│   └─ push_metrics_datadog.py
+│
+├─ config/
+│   ├─ environments/
+│   │   ├─ qa.yml
+│   │   └─ perf.yml
+│   ├─ thresholds/
+│   │   ├─ performance.yml
+│   │   ├─ stress.yml
+│   │   └─ endurance.yml
+│
+└─ docs/
+    └─ operating-model.md
+
+5️⃣ Repo de tests (independiente)
+📦 Repo: perf-tests
+perf-tests/
+│
+├─ performance/
+│   ├─ login_perf.jmx
+│   └─ checkout_perf.jmx
+│
+├─ stress/
+│   ├─ checkout_stress.jmx
+│
+├─ endurance/
+│   ├─ checkout_8h.jmx
+│
+├─ data/
+│   └─ users.csv
+│
+└─ properties/
+    ├─ qa.properties
+    └─ perf.properties
+
+
+📌 Naming define el tipo de test, no lógica en el .jmx.
+
+6️⃣ Diferenciación por tipo de test
+Cada pipeline aplica:
+
+Duración
+
+Thresholds
+
+Ramp-up
+
+SLAs
+
+Ejemplo:
+
+Tipo	Pipeline	Threshold
+Performance	performance.yml	p95 < 2s
+Stress	stress.yml	error < 5%
+Endurance	endurance.yml	estabilidad
