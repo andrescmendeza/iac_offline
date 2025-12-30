@@ -51,3 +51,12 @@ New “Super Machine” Slave
 Implement performance configuration optimizations on the JMeter master and slave nodes.
 Run the Azure pipeline directly from the JMeter master server .31 to minimize additional network traffic between the performance test and pipeline execution.
 
+
+
+| Configuration                         | Advantages                                  | Disadvantages                                |
+| ------------------------------------- | ------------------------------------------- | -------------------------------------------- |
+| Master + Slave with increased RAM     | Leverages existing hardware, lower cost     | Still a small distributed environment        |
+| Master + Super Slave                  | Excellent load capacity, future scalability | Higher cost                                  |
+| Single Super Machine (no distributed) | Simplicity, zero Master–Slave latency       | Single point of failure; limited to one host |
+
+
