@@ -200,3 +200,98 @@ nc -zv SLAVE_IP 50000
 | Carga moderada (≤1500 threads HTTP simples)         | **8 GB**              | `-Xms3G -Xmx4G`      |
 | Carga alta (1500–3000 threads, JSON parsing)        | **12–16 GB**          | `-Xms6G -Xmx8G`      |
 | Casos pesados (WebSockets, JWT, muchos extractores) | **>16 GB**            | `-Xms8G -Xmx12G`     |
+
+Tag dinámico por ejecución de prueba para aislamiento de métricas JMeter en Datadog
+1️⃣ Problema Identificado
+
+Actualmente, las métricas generadas por JMeter se envían tanto a Datadog Enterprise como a Datadog CFS, mezclándose con las métricas productivas del Open Engine.
+Esto genera:
+
+Dificultad para identificar el origen de las métricas
+
+Datos contaminados en los procesos de extracción (API Jobs)
+
+Riesgos de análisis erróneo en reportes y monitoreo
+
+No es viable modificar la configuración interna de Datadog.
+
+2️⃣ Solución Propuesta
+
+Implementar un tag dinámico por ejecución del test generado desde JMeter y utilizado en los pipelines de extracción con Datadog API.
+
+Componentes del tagging:
+
+source:jmeter → Identifica origen de las métricas
+
+loadtest:true → Diferencia tráfico de prueba vs. tráfico real
+
+test_id:<UUID> → Etiqueta única por ejecución del pipeline
+
+Ejemplo:
+
+source:jmeter, loadtest:true, test_id:${TEST_UUID}
+
+
+El TEST_UUID se genera automáticamente con ${__UUID} en JMeter al inicio de cada ejecución.
+
+
+
+
+
+
+
+Azure DevOps Pipeline A (JMeter Test Execution)
+   │
+   ▼
+Tagging of Metrics (test_id, source:jmeter)
+   │
+   ├─► Datadog Enterprise (JMeter metrics)
+   └─► Datadog CFS (Service metrics)
+
+⏱ Scheduled Pipeline Execution
+Azure DevOps Pipeline B (API Job)
+   │
+   ▼
+Python Script: Datadog Ingestion
+   - Hosted on Azure DevOps Agent
+   - API Keys stored in Azure Key Vault
+   │
+   ├─► Datadog Enterprise API
+   │        (Query JMeter metrics filtered by tags)
+   │
+   └─► Datadog CFS API
+            (Query service metrics excluding JMeter)
+   │
+   ▼
+Python Script: Data Transformation
+   - Normalize fields
+   - Apply run_id and timestamps
+   - Separate JMeter vs Service datasets
+   │
+   ▼
+Python Script: Data Loading
+   - Insert into Azure Database for PostgreSQL
+   - Private Endpoint + Firewall rules
+   │
+   ▼
+Azure Database for PostgreSQL (Flexible Server)
+   - Central metrics repository
+   - Structured tables for historical analysis
+   │
+   ▼
+Reporting & Automation
+   - Power BI (Dashboards)
+   - Email & Slack Alerts (Azure DevOps or Logic Apps)
+   - Export to Confluence
+
+
+
+| Requirement                          | Recommended Azure Service                         | Alternative                            |
+| ------------------------------------ | ------------------------------------------------- | -------------------------------------- |
+| Scheduling of API Job                | ❇ Azure Pipelines (Scheduled Triggers)            | Azure Functions Timer (low cost)       |
+| Python script execution              | ✔ Azure Pipelines Agent                           | Azure Container Apps / Azure Functions |
+| Metrics persistence                  | ✔ Azure Database for PostgreSQL (Flexible Server) | CosmosDB (if scaling to NoSQL)         |
+| Temporary storage for files and logs | Azure Blob Storage                                | FileShare                              |
+| Secure access to Datadog API keys    | Azure Key Vault for storing API keys              | N/A                                    |
+
+
