@@ -1,3 +1,15 @@
+
+1AAyudae a poner eto en terminos de un consultor experto
+
+
+Actualmente todas las actividades de configuracion se han estado haciendo de manera manual. Esto hace que las repicaciones de dichas configuraciones no esten exentas de olvidadr alguna parametrizacion o un paso especifico.
+
+
+
+Se tiene como gran limitante que las maquinas donde se instalan los componentes JMeter, java, etc no tienen conexion a internet por lo que se hace necesario poder tener un repo en el cual se mantengan los binarios y versiones que permitan instalar facilmente las herramientas.
+
+De cierta manera se ha venido realizando un versionaiento de ello pero se propone trabajar en un modo IaC offline que permita estructurar un repo de la siguiente manera:
+
 # iac_offline
 
 Git Repo
