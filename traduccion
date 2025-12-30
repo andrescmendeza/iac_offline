@@ -24,3 +24,29 @@ JMeter Performance Estimates
 | HTTP with large JSON | **600 – 1,200**   | **80 – 300**      |
 | WebSockets / gRPC    | **300 – 700**     | **<150**          |
 | Selenium             | ❌ 5–20 browsers   | ❌ Not recommended |
+
+
+Upgraded Slave (Memory Only)
+
+| Resource | Upgraded Slave (RAM Only)            | General JMeter Recommendation                              |
+| -------- | ------------------------------------ | ---------------------------------------------------------- |
+| CPU      | Intel i5-8500T – 6 cores / 6 threads | ✔️ Sufficient for medium-scale distributed load generation |
+| RAM      | **16 GB**                            | ✔️ Good for higher thread counts and larger JVM heap       |
+| Disk     | NVMe 218 GB                          | ✔️ Fast and large enough                                   |
+| Network  | Standard 1 GbE                       | ✔️ Suitable for distributed testing                        |
+| OS       | Ubuntu 24.04 LTS                     | ✔️ Fully compatible                                        |
+
+
+New “Super Machine” Slave
+
+| Resource | New “Super Machine” Slave   | General JMeter Recommendation                          |
+| -------- | --------------------------- | ------------------------------------------------------ |
+| CPU      | 12 cores / 24 threads       | 🏆 Ideal for high-scale tests and complex scripts      |
+| RAM      | **32 GB**                   | 🏆 Great for large heap sizes and thousands of threads |
+| Disk     | NVMe 500 GB                 | ✔️ Excellent speed and capacity                        |
+| Network  | 1–10 GbE (10 GbE preferred) | 🏆 Optimal for high-volume distributed testing         |
+| OS       | Ubuntu 24.04 LTS            | ✔️ Fully compatible                                    |
+
+
+
+
