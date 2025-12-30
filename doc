@@ -294,4 +294,64 @@ Reporting & Automation
 | Temporary storage for files and logs | Azure Blob Storage                                | FileShare                              |
 | Secure access to Datadog API keys    | Azure Key Vault for storing API keys              | N/A                                    |
 
+Azure DevOps Pipeline A
+┌─────────────────────────────────────────────────────────┐
+│ Stage 1: Preparation                                     │
+│  - Download JMeter scripts (.jmx)                        │
+│  - Load test configuration (threads, duration, ramp-up)  │
+│  - Generate UUID test_id                                │
+└─────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│ Stage 2: Test Execution                                  │
+│  - Run JMeter Engine                                     │
+│  - Real-time KPIs and logs                               │
+│  - Apply tags (test_id, source:jmeter, pipeline_run_id)  │
+└─────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│ Stage 3: Metrics Forwarding                              │
+│  - Publish results to Datadog Enterprise                 │
+│  - Publish service interaction telemetry to Datadog CFS  │
+│  - Validation of tagged ingestion                        │
+└─────────────────────────────────────────────────────────┘
+
+
+⏱ Azure DevOps Pipeline B
+┌─────────────────────────────────────────────────────────┐
+│ Stage 1: Datadog Extraction                              │
+│  - Retrieve JMeter metrics from Datadog Enterprise       │
+│      ▷ Filter: source:jmeter AND test_id                 │
+│  - Retrieve service metrics from Datadog CFS             │
+│      ▷ Exclude JMeter traffic by tag filtering           │
+│  - Auth using Azure Key Vault stored Secrets             │
+└─────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│ Stage 2: Transformation                                  │
+│  - Normalize column names                                │
+│  - Clean tags (mapping + enrichment)                     │
+│  - Assign run_id & timestamps                            │
+│  - Split datasets: jmeter_metrics / service_metrics      │
+└─────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│ Stage 3: Loading                                         │
+│  - Bulk insert into Azure PostgreSQL (Flexible Server)   │
+│  - Ensure schema consistency & constraints               │
+│  - Private Endpoint connectivity validation              │
+└─────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│ Stage 4: Reporting & Notifications                       │
+│  - Slack / Email alerts                                  │
+│  - Power BI dashboards refresh                           │
+│  - Export to Confluence                                  │
+└─────────────────────────────────────────────────────────┘
+
 
