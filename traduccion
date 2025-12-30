@@ -48,5 +48,6 @@ New “Super Machine” Slave
 | OS       | Ubuntu 24.04 LTS            | ✔️ Fully compatible                                    |
 
 
-
+Implement performance configuration optimizations on the JMeter master and slave nodes.
+Run the Azure pipeline directly from the JMeter master server .31 to minimize additional network traffic between the performance test and pipeline execution.
 
