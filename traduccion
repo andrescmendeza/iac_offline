@@ -1,3 +1,52 @@
+Git Repo
+│
+├─ jmeter/
+│   ├─ bin/                 (offline bundle)
+│   ├─ lib/
+│   ├─ plugins/
+│
+├─ java/
+│   └─ jdk.tar.gz
+│
+├─ config/
+│   ├─ master/
+│   │   └─ jmeter.properties
+│   ├─ slave/
+│   │   └─ jmeter.properties
+│
+├─ scripts/
+│   ├─ install_java.sh
+│   ├─ install_jmeter.sh
+│   ├─ configure_master.sh
+│   ├─ configure_slave.sh
+│   ├─ start_slave.sh
+│   └─ validate_cluster.sh
+│
+└─ pipelines/
+    └─ setup-jmeter.yml
+
+
+IaC / DevOps
+   │
+   ▼
+Git Repo (scripts)
+   │
+   ▼
+Azure DevOps Pipeline: Setup JMeter
+   │
+   ├─ Configure Master
+   │     ├─ Install Java on master
+   │     ├─ Install JMeter on master
+   │     └─ Configure JMeter master
+   │
+   └─ Configure Slaves
+         ├─ Install Java on slave nodes
+         ├─ Install JMeter on slave nodes
+         └─ Configure JMeter slaves
+
+
+
+
 Connectivity / Network Issues
 
 JMeter Slave saturated → cannot process requests → Master Timeout
