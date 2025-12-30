@@ -1,0 +1,202 @@
+Analisis de Maquinas Disponibles
+
+  📌 Especificaciones rápidas
+Recurso	Tu máquina	Recomendación general JMeter
+CPU	Intel i5-8500T – 6 cores / 6 hilos	✔️ Suficiente para cargas medianas
+RAM	7.6 GB	✔️ Adecuada para GUI Master o Slave de carga moderada
+Disco	NVMe 218 GB	✔️ Muy bien, rápido y mucho espacio
+Red	1 GbE estándar	✔️ Apta para distribuidos
+OS	Ubuntu 24.04 LTS	✔️ Compatible
+
+
+¿Para JMeter Master?
+
+Sí, funciona bien. El Master solo coordina y recolecta resultados → no ejecuta carga pesada.
+
+Recomendación:
+
+Ejecutar JMeter en modo sin interfaz (non-GUI) si tienes test grandes.
+
+Aumentar archivos abiertos:
+ulimit -n 65000
+
+
+¿Para JMeter Slave (generación de carga)?
+
+También es válido como Slave, pero:
+
+✔️ Puede generar un buen número de hilos VS (aprox. 1k-3k dependiendo del script y protocolos).
+⚠️ No sirve para cargas muy grandes o pesadas, por:
+
+6 hilos de CPU (sin HyperThreading)
+
+~8 GB RAM — si el script usa mucha memoria, limita la carga.
+
+📌 Si usas HTTP simple → buena capacidad
+📌 Si usas WebSockets / gRPC / mucha extracción JSON o XPath → reduce la carga posible
+
+
+Observaciones operativas
+Estado actual	Impacto	Recomendación
+ulimit -n = 1024	❌ Límite de conexiones bajo	Subir a 65k mínimo
+Ping a Slaves 32 y 33 falla	❌ No hay conectividad	Revisar red o firewall
+RMI Port check a 1099 no responde	❌ JMeter distribuido no funcionará	Validar reachability y puertos
+Load promedio ~1.0 idle	✔️ OK	Sin riesgo
+
+Ejemplo para habilitar puertos RMI:
+
+sudo ufw allow 1099
+sudo ufw allow 50000
+
+Conclusión
+Rol	¿Recomendado?	Capacidad
+JMeter Master	✅ Sí	Ideal
+JMeter Slave	⚠️ Sí, pero carga moderada	~1k-3k usuarios virtuales (variable)
+
+Si tu objetivo es solo Master, esta máquina es perfecta.
+Si quieres Slave de alto rendimiento, necesitarías más CPU/RAM.
+
+
+  Performance en JMeter
+
+  | Tipo de prueba       | Usuarios Virtuales | Peticiones/seg |
+| -------------------- | ------------------ | -------------- |
+| HTTP simple          | **1,500 – 3,000**  | **200 – 800**  |
+| HTTP con JSON grande | **600 – 1,200**    | **80 – 300**   |
+| WebSockets/gRPC      | **300 – 700**      | **<150**       |
+| Selenium             | ❌ 5–20 browsers    | ❌              |
+
+
+
+Posibles Causas de Timeouts — Azure DevOps + JMeter Distribuido
+1️⃣ Problemas de Conectividad / Red
+
+Los Slaves no responden a tiempo al Master → timeout
+
+🔍 Señales:
+
+PING fallando (como ya vimos)
+
+nc -zv slave 1099 fallando (puertos RMI bloqueados)
+
+SSH intermitente
+
+📌 Causas típicas:
+
+Firewall interno bloquea puertos RMI (1099, 50000)
+
+DNS o rutas no resueltas (IPs privadas mal configuradas)
+
+VPN o Segmentación de red entre Cloud y LAN
+
+Network bandwidth saturada por respuestas grandes
+
+2️⃣ Recursos insuficientes del Slave
+
+JMeter Slave saturado → no procesa peticiones → Master Timeout
+
+📌 Signos:
+
+CPU al 100%
+
+GC Pauses elevadas
+
+Heap lleno → OutOfMemoryError
+
+Hilos bloqueados esperando IO
+
+➡ Esto es común si el test tiene:
+✔ Assertions pesadas
+✔ JSON extractions masivos
+✔ Listeners en el slave (deben estar todos en master)
+
+3️⃣ El tiempo del pipeline no coincide con el SLA del test
+
+Ejemplo:
+
+Azure tiene timeout de job: 60 minutos
+
+Tu test dura 65 minutos → Azure lo mata automáticamente
+
+📌 Ajustar:
+
+Timeout del Stage
+
+Timeout del Job/Task
+
+Duración real del test
+
+4️⃣ RMI Timeouts por configuración default
+
+JMeter por defecto usa puertos dinámicos → inestables en red corporativa
+
+📌 Fijar puertos:
+
+server.rmi.localport=1099
+client.rmi.localport=50000
+mode=StrippedBatch
+
+
+📌 Asegurar que esos puertos están abiertos bidireccionalmente
+
+5️⃣ Azure Agent ejecutando GUI accidentalmente
+
+El pipeline abre un runner gráfico:
+➡ Consume CPU+RAM innecesaria
+➡ Se cuelga o se desconecta
+
+📌 Obligatorio correr en modo no-GUI:
+
+jmeter -n -t plan.jmx -R slave01,slave02 ...
+
+6️⃣ Manejo incorrecto de resultados
+
+Si el Master intenta guardar todos los samples en .jtl, se ahoga:
+
+.jtl gigantescos → IO Block
+
+master tratando de “digerir” estadísticas de todos los slaves
+
+📌 Recomendación:
+
+jmeter.save.saveservice.output_format=csv
+jmeter.save.saveservice.autoflush=true
+
+
+Y usar Summary Report o Backend Listener (InfluxDB)
+
+7️⃣ GC y JVM mal configurada
+
+Heap pequeño → GC constante → pérdida de respuestas
+
+✔ Ajustar en slaves:
+
+export JVM_ARGS="-Xms2G -Xmx4G -XX:+UseG1GC"
+
+🧠 Resumen rápido de las causas más probables en tu caso
+Causa	Probabilidad	Evidencia
+Red / No hay ping ni puertos accesibles	⭐⭐⭐⭐⭐	Lo vimos: ping a los slaves falla
+Puertos RMI bloqueados	⭐⭐⭐⭐	nc no conecta
+Saturación del Slave	⭐⭐⭐	Depende del script y #hilos
+Timeout de Azure (Job/Task)	⭐⭐	Puede estar ocurriendo aparte
+Logs / JTL gigantes	⭐⭐	Depende del listener configurado
+🎯 ¿Qué hacer inmediatamente?
+
+✔ Probar conectividad real entre Master ↔ Slaves:
+
+ping SLAVE_IP
+nc -zv SLAVE_IP 1099
+nc -zv SLAVE_IP 50000
+
+
+✔ Confirmar sin GUI
+✔ Ajustar Heap, logs y sysctl como antes
+✔ Validar límite de tiempo del pipeline
+
+  Recomendación de mejora de memoria
+
+  | Escenario de uso del Slave                          | RAM Total recomendada | Heap JVM recomendada |
+| --------------------------------------------------- | --------------------- | -------------------- |
+| Carga moderada (≤1500 threads HTTP simples)         | **8 GB**              | `-Xms3G -Xmx4G`      |
+| Carga alta (1500–3000 threads, JSON parsing)        | **12–16 GB**          | `-Xms6G -Xmx8G`      |
+| Casos pesados (WebSockets, JWT, muchos extractores) | **>16 GB**            | `-Xms8G -Xmx12G`     |
