@@ -1,3 +1,9 @@
+Currently, all configuration activities have been performed manually, which increases the risk of missing specific parameters or steps during replication.
+
+A key constraint is that the machines hosting JMeter, Java, and related components have no internet access. Therefore, it is necessary to maintain a repository of binaries and versions that enable straightforward, consistent installations.
+
+While versioning has been partially implemented, it is recommended to adopt an offline Infrastructure-as-Code (IaC) approach, structuring the repository to reliably manage and deploy all required tools and configurations.
+
 Git Repo
 │
 ├─ jmeter/
