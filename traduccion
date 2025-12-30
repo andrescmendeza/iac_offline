@@ -1,0 +1,26 @@
+Connectivity / Network Issues
+
+JMeter Slave saturated → cannot process requests → Master Timeout
+
+Pipeline execution time does not match the test SLA
+
+RMI Timeouts due to default configuration
+
+Machine Capability Assessment
+
+| Resource | Lab Machine Specs                    | General JMeter Recommendation                  |
+| -------- | ------------------------------------ | ---------------------------------------------- |
+| CPU      | Intel i5-8500T – 6 cores / 6 threads | ✔️ Sufficient for medium-scale load generation |
+| RAM      | 7.6 GB                               | ✔️ Good for GUI Master or low-load Slave       |
+| Disk     | NVMe 218 GB                          | ✔️ Very good, fast and large enough            |
+| Network  | Standard 1 GbE                       | ✔️ Suitable for distributed testing            |
+| OS       | Ubuntu 24.04 LTS                     | ✔️ Fully compatible                            |
+
+JMeter Performance Estimates
+
+| Test Type            | Virtual Users     | Requests/sec      |
+| -------------------- | ----------------- | ----------------- |
+| Simple HTTP          | **1,500 – 3,000** | **200 – 800**     |
+| HTTP with large JSON | **600 – 1,200**   | **80 – 300**      |
+| WebSockets / gRPC    | **300 – 700**     | **<150**          |
+| Selenium             | ❌ 5–20 browsers   | ❌ Not recommended |
