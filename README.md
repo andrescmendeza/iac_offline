@@ -1,457 +1,112 @@
+🟦 SCRIPT 1 — Pipeline A (CI/CD & Test Execution)
+🎙️ Script
 
-1AAyudae a poner eto en terminos de un consultor experto
+This diagram represents Pipeline A, which is our CI/CD execution pipeline.
+Its responsibility is strictly limited to preparing, executing, and tagging performance tests.
 
+In the preparation stage, the pipeline retrieves the JMeter test scripts, loads the execution parameters such as threads, duration, and ramp-up, and generates a unique TEST_UUID. This identifier is critical, as it becomes the correlation key across the entire architecture.
 
-Actualmente todas las actividades de configuracion se han estado haciendo de manera manual. Esto hace que las repicaciones de dichas configuraciones no esten exentas de olvidadr alguna parametrizacion o un paso especifico.
+During execution, the JMeter engine runs the test and generates real-time KPIs and logs. All telemetry is tagged consistently with the TEST_UUID, the source identifier, and the pipeline run ID.
 
+Finally, the pipeline forwards all metrics and logs to Datadog for observability. At this point, Pipeline A’s job is complete. It does not persist data, it does not transform data, and it does not generate reports.
 
+Pipeline A is designed to be deterministic, repeatable, and stateless.
 
-Se tiene como gran limitante que las maquinas donde se instalan los componentes JMeter, java, etc no tienen conexion a internet por lo que se hace necesario poder tener un repo en el cual se mantengan los binarios y versiones que permitan instalar facilmente las herramientas.
+❓ Likely Questions & Technical Answers
 
-De cierta manera se ha venido realizando un versionaiento de ello pero se propone trabajar en un modo IaC offline que permita estructurar un repo de la siguiente manera:
+Q: Why doesn’t Pipeline A store results directly in a database?
+A:
+Pipeline A is intentionally scoped to execution and observability only. Persisting results would tightly couple execution with analytics. By publishing telemetry to Datadog, we preserve real-time visibility while keeping data processing decoupled and scalable downstream.
 
-# iac_offline
+Q: How do you ensure traceability across systems?
+A:
+The TEST_UUID is generated once and propagated across all telemetry. This UUID becomes the join key across Datadog, storage, processing, and reporting layers.
 
-Git Repo
-│
-├─ jmeter/
-│   ├─ bin/                 (offline bundle)
-│   ├─ lib/
-│   ├─ plugins/
-│
-├─ java/
-│   └─ jdk.tar.gz
-│
-├─ config/
-│   ├─ master/
-│   │   └─ jmeter.properties
-│   ├─ slave/
-│   │   └─ jmeter.properties
-│
-├─ scripts/
-│   ├─ install_java.sh
-│   ├─ install_jmeter.sh
-│   ├─ configure_master.sh
-│   ├─ configure_slave.sh
-│   ├─ start_slave.sh
-│   └─ validate_cluster.sh
-│
-└─ pipelines/
-    └─ setup-jmeter.yml
+Q: What happens if a test fails halfway?
+A:
+Partial telemetry is still sent to Datadog with the same TEST_UUID, allowing us to analyze failure behavior without losing observability or corrupting downstream datasets.
 
+🟦 SCRIPT 2 — Datadog Extraction (Raw Logs Export)
+🎙️ Script
 
-🔧 Paso 1 — Empaquetar JMeter (offline)
+This diagram shows the Datadog extraction layer, which is intentionally abstracted from any specific Datadog API.
 
-Desde una máquina con internet:
+The key principle here is that we extract logs in their raw format. No transformations, no aggregations, and no filtering beyond basic correlation metadata.
 
-Descargas:
+The extraction mechanism captures the original log structure and persists it into a central object storage. This storage layer acts as the system of record for all observability data.
 
-JDK (misma versión)
+By introducing this storage boundary, we completely decouple log capture from log processing. This enables replay, reprocessing, auditing, and future tooling changes without impacting upstream systems.
 
-Apache JMeter
+At this stage, no analytics or business logic is applied.
 
-Plugins necesarios
+❓ Likely Questions & Technical Answers
 
-Los comprimes:
+Q: Why avoid querying Datadog APIs directly?
+A:
+API-based extraction introduces coupling to retention policies, indexing, and query limits. Exporting raw logs ensures durability, replayability, and independence from Datadog’s query layer.
 
-tar -czf jmeter-bundle.tar.gz apache-jmeter/
+Q: Is this compliant with audit or forensic requirements?
+A:
+Yes. Raw logs are preserved in their original form in object storage, which supports traceability, immutability policies, and long-term retention.
 
+Q: Can this support future tooling changes?
+A:
+Absolutely. Because the raw data is preserved, the processing engine can evolve independently of the extraction mechanism.
 
-Este bundle se convierte en artefacto.
+🟦 SCRIPT 3 — Python Engine (Data Processing Flow)
+🎙️ Script
 
-🔧 Paso 2 — Scripts idempotentes (clave)
-
-Ejemplo: install_jmeter.sh
-
-if [ ! -d /opt/jmeter ]; then
-  tar -xzf jmeter-bundle.tar.gz -C /opt
-fi
-
-
-👉 Puedes correrlo 10 veces y no rompe nada.
+This diagram represents the Python Engine, which is the core data processing component.
 
-🔧 Paso 3 — Configuración declarativa
-Master:
-remote_hosts=10.0.0.32,10.0.0.33
-server.rmi.ssl.disable=true
+The engine consumes raw logs from object storage and processes them through a clear, linear flow: extraction, normalization, enrichment, dataset separation, loading, and reporting.
 
-Slaves:
-server_port=1099
-server.rmi.ssl.disable=true
+Normalization ensures consistent field names and timestamps. Enrichment adds execution metadata such as run identifiers and test context. The data is then split into logically independent datasets, such as JMeter metrics and service-level metrics.
 
+Only after these steps do we load curated data into PostgreSQL, ensuring idempotency and consistency.
 
-Copiadas automáticamente según rol.
+Reporting is treated as a downstream, non-blocking activity and never affects data persistence.
 
-🔧 Paso 4 — Validaciones automáticas
+❓ Likely Questions & Technical Answers
 
-Ejemplo:
+Q: Why use a Python engine instead of processing directly in the pipeline?
+A:
+Pipelines are orchestration tools, not data engines. Separating execution from orchestration improves scalability, testability, and operational resilience.
 
-nc -z 10.0.0.32 1099
-nc -z 10.0.0.33 1099
+Q: How do you prevent duplicate data inserts?
+A:
+The loader enforces idempotency using TEST_UUID and dataset-level constraints. Reprocessing the same input does not create duplicates.
 
+Q: Can this engine scale or be replaced later?
+A:
+Yes. The engine is stateless and modular. It can later be migrated to Airflow, Spark, or containerized jobs without architectural changes.
 
-Fail = pipeline falla.
+🟦 SCRIPT 4 — Pipeline B (Data Orchestration & Reporting)
+🎙️ Script
 
-🚀 Paso 5 — Azure DevOps Pipeline (IaC runner)
-Pipeline de setup (solo corre cuando hay cambios)
-stages:
-- stage: SetupJMeter
-  jobs:
-  - job: ConfigureMaster
-    pool: jmeter-master
-    steps:
-    - script: scripts/install_java.sh
-    - script: scripts/install_jmeter.sh
-    - script: scripts/configure_master.sh
-
-  - job: ConfigureSlaves
-    pool: jmeter-slaves
-    steps:
-    - script: scripts/install_java.sh
-    - script: scripts/install_jmeter.sh
-    - script: scripts/configure_slave.sh
-
-Flujo del pipeline para ejecucion de los test
-
-Dev / QA
-  │
-  ▼
-Git Repo (tests)
-  │
-  ▼
-Azure DevOps Pipeline
-  │
-  ├─ Checkout repo
-  ├─ Copiar tests al Master (.31)
-  ├─ Seleccionar qué test correr
-  ├─ Ejecutar JMeter (CLI)
-  ├─ Recoger resultados
-  └─ Publicar artefactos
-
-4️⃣ Estructura típica del repositorio
-jmeter-tests/
-│
-├─ tests/
-│   ├─ login_test.jmx
-│   ├─ checkout_test.jmx
-│   └─ search_test.jmx
-│
-├─ data/
-│   ├─ users.csv
-│   └─ products.csv
-│
-├─ properties/
-│   ├─ dev.properties
-│   ├─ qa.properties
-│   └─ perf.properties
-│
-├─ scripts/
-│   └─ run_jmeter.sh
-│
-└─ azure-pipelines.yml
+Pipeline B is the data orchestration pipeline. Its role is to coordinate when and how data is processed, not to process the data itself.
 
-1️⃣2️⃣ Flujo visual final
-Git (tests)
-   │
-   ▼
-Azure Pipeline
-   │
-   ▼
-Agent (.31)
-   │
-   ▼
-JMeter Master
-   │
-   ├─ Slave (.32)
-   └─ Slave (.33)
+It triggers raw data extraction availability, invokes the Python Engine, and validates the completion of each stage.
 
-   🔑 Reglas de oro (muy importantes)
+Once data has been successfully processed and stored, Pipeline B coordinates report generation and notification delivery through email, Slack, or Confluence.
 
-Tests viven en Git
+This separation ensures that failures in reporting do not affect data integrity.
 
-Pipeline siempre orquesta
+❓ Likely Questions & Technical Answers
 
-JMeter nunca decide
+Q: Why is Pipeline B separate from Pipeline A?
+A:
+Pipeline A handles execution and observability; Pipeline B handles data lifecycle and analytics. This separation reduces blast radius and allows independent scaling and evolution.
 
-Resultados no se versionan
+Q: What happens if Pipeline B fails?
+A:
+No data is lost. Raw logs remain in storage, and processing can be retried safely due to idempotent design.
 
-Master = punto de control
+Q: Is reporting mandatory for pipeline success?
+A:
+No. Reporting is explicitly decoupled. Data persistence is the success criterion; reporting is a downstream concern.
 
+🧠 Final Tip for Presentation
 
-8️⃣ Ejemplo REAL de pipeline
-trigger: none
+If you want to close strong, use this sentence:
 
-parameters:
-- name: test
-  default: checkout_test.jmx
-
-pool:
-  name: jmeter-master
-
-steps:
-- checkout: self
-
-- script: |
-    /opt/jmeter/bin/jmeter \
-      -n \
-      -t tests/${{ parameters.test }} \
-      -R 10.0.0.32,10.0.0.33 \
-      -l results.jtl \
-      -e -o report/
-  displayName: Run JMeter Test
-
-- publish: report
-  artifact: jmeter-report
-
-9️⃣ ¿Cómo JMeter ejecuta realmente?
-En el Master (.31):
-jmeter -n \
-  -t checkout_test.jmx \
-  -R slave1,slave2
-
-
-JMeter:
-
-Lee el .jmx
-
-Distribuye el plan a los slaves
-
-Ejecuta carga desde los slaves
-
-Recoge métricas
-
-Genera resultados
-
-🔟 ¿Cómo se versiona un cambio de test?
-
-Ejemplo:
-
-Ajustas el ramp-up
-
-Cambias assertions
-
-Cambias timers
-
-👉 Commit → Push → Pipeline ejecuta nueva versión
-👉 Repetible
-👉 Audit trail completo
-
-1️⃣1️⃣ Qué pasa si agrego un nuevo test
-
-Agregas new_api_test.jmx
-
-Commit a Git
-
-Ejecutas pipeline pasando:
-
-test = new_api_test.jmx
-
-
-JMeter lo corre
-
-📌 Nada se “auto-activa”.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-1️⃣ Arquitectura final – Master, agentes, slaves y tests
-📍 Infra física / lógica
-┌────────────────────────────┐
-│ Azure DevOps                │
-│  - Pipelines                │
-└────────────┬───────────────┘
-             │
-             ▼
-┌────────────────────────────┐
-│ JMeter Master (.31)         │
-│ - Azure DevOps Agent        │
-│ - JMeter CLI                │
-│ - Scripts ejecución         │
-│ - Workspace de pipelines    │
-└────────────┬───────────────┘
-             │ RMI
-     ┌───────┴────────┐
-     ▼                ▼
-┌─────────────┐  ┌─────────────┐
-│ Slave (.32) │  │ Slave (.33) │
-│ - JMeter    │  │ - JMeter    │
-│ - Java      │  │ - Java      │
-└─────────────┘  └─────────────┘
-
-
-📌 Reglas claras:
-
-El agente vive solo en el master
-
-Los slaves no conocen Azure DevOps
-
-El pipeline controla al master
-
-JMeter no toma decisiones
-
-2️⃣ Flujo de ejecución del pipeline (end-to-end)
-Trigger manual / schedule
-        │
-        ▼
-Stage 1 — Prepare
-  - Checkout repos
-  - Validaciones
-        │
-        ▼
-Stage 2 — Execute Test
-  - Run JMeter
-  - Distributed load
-        │
-        ▼
-Stage 3 — Validate Results
-  - Parse JTL
-  - Apply thresholds
-        │
-        ▼
-Stage 4 — Publish
-  - Artifacts
-  - Metrics (Datadog)
-  - Notifications
-
-
-📌 Pipeline = orquestador total
-
-3️⃣ Estructura del pipeline (stages reales)
-🧩 Stage 1 — Prepare
-
-Objetivo: dejar todo listo y fallar rápido si algo está mal.
-
-Checkout repos
-
-Validar conexión a slaves
-
-Validar parámetros
-
-- stage: Prepare
-  jobs:
-  - job: Precheck
-    steps:
-    - checkout: self
-    - checkout: tests
-    - script: scripts/validate_cluster.sh
-
-🧩 Stage 2 — Execute
-
-Objetivo: ejecutar exactamente UN test.
-
-- stage: Execute
-  jobs:
-  - job: RunJMeter
-    steps:
-    - script: |
-        jmeter -n \
-          -t tests/$(TEST_FILE) \
-          -R $(SLAVES) \
-          -l results/results.jtl \
-          -e -o report/
-
-🧩 Stage 3 — Validate
-
-Objetivo: decidir PASS / FAIL.
-
-Parse .jtl
-
-Evaluar SLAs
-
-Fallar pipeline si no cumple
-
-- stage: Validate
-  jobs:
-  - job: Evaluate
-    steps:
-    - script: python scripts/evaluate_results.py
-
-🧩 Stage 4 — Publish
-
-Objetivo: sacar resultados fuera del pipeline.
-
-Artifacts
-
-Datadog
-
-Slack / Confluence
-
-4️⃣ Estructura del nuevo repositorio (pipelines + config)
-📦 Repo: perf-platform
-perf-platform/
-│
-├─ pipelines/
-│   ├─ performance.yml
-│   ├─ stress.yml
-│   ├─ endurance.yml
-│
-├─ scripts/
-│   ├─ run_jmeter.sh
-│   ├─ validate_cluster.sh
-│   ├─ evaluate_results.py
-│   └─ push_metrics_datadog.py
-│
-├─ config/
-│   ├─ environments/
-│   │   ├─ qa.yml
-│   │   └─ perf.yml
-│   ├─ thresholds/
-│   │   ├─ performance.yml
-│   │   ├─ stress.yml
-│   │   └─ endurance.yml
-│
-└─ docs/
-    └─ operating-model.md
-
-5️⃣ Repo de tests (independiente)
-📦 Repo: perf-tests
-perf-tests/
-│
-├─ performance/
-│   ├─ login_perf.jmx
-│   └─ checkout_perf.jmx
-│
-├─ stress/
-│   ├─ checkout_stress.jmx
-│
-├─ endurance/
-│   ├─ checkout_8h.jmx
-│
-├─ data/
-│   └─ users.csv
-│
-└─ properties/
-    ├─ qa.properties
-    └─ perf.properties
-
-
-📌 Naming define el tipo de test, no lógica en el .jmx.
-
-6️⃣ Diferenciación por tipo de test
-Cada pipeline aplica:
-
-Duración
-
-Thresholds
-
-Ramp-up
-
-SLAs
-
-Ejemplo:
-
-Tipo	Pipeline	Threshold
-Performance	performance.yml	p95 < 2s
-Stress	stress.yml	error < 5%
-Endurance	endurance.yml	estabilidad
+This architecture cleanly separates execution, observability, extraction, processing, and reporting, ensuring traceability, scalability, and long-term maintainability.
