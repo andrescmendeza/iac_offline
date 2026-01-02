@@ -1,111 +1,59 @@
-Pipeline A (CI/CD & Test Execution)
+# IaC Offline
 
-This diagram represents Pipeline A, which is our CI/CD execution pipeline.
-Its responsibility is strictly limited to preparing, executing, and tagging performance tests.
+Infrastructure as Code (IaC) utilities designed for **offline / air-gapped environments**, focused on **performance testing platforms**, **JMeter distributed execution**, and **reproducible system hardening**.
 
-In the preparation stage, the pipeline retrieves the JMeter test scripts, loads the execution parameters such as threads, duration, and ramp-up, and generates a unique TEST_UUID. This identifier is critical, as it becomes the correlation key across the entire architecture.
+This repository provides scripts, documentation, and architectural references to standardize infrastructure configuration where **internet access is not available** and **manual setup is error-prone**.
 
-During execution, the JMeter engine runs the test and generates real-time KPIs and logs. All telemetry is tagged consistently with the TEST_UUID, the source identifier, and the pipeline run ID.
+---
 
-Finally, the pipeline forwards all metrics and logs to Datadog for observability. At this point, Pipeline A’s job is complete. It does not persist data, it does not transform data, and it does not generate reports.
+## 🚀 Purpose
 
-Pipeline A is designed to be deterministic, repeatable, and stateless.
+In restricted or isolated environments, infrastructure configuration is often performed manually, leading to:
 
-❓ Likely Questions & Technical Answers
+- Configuration drift
+- Inconsistent environments
+- Performance instability
+- Difficult troubleshooting and audits
 
-Q: Why doesn’t Pipeline A store results directly in a database?
-A:
-Pipeline A is intentionally scoped to execution and observability only. Persisting results would tightly couple execution with analytics. By publishing telemetry to Datadog, we preserve real-time visibility while keeping data processing decoupled and scalable downstream.
+This repository addresses those problems by providing:
 
-Q: How do you ensure traceability across systems?
-A:
-The TEST_UUID is generated once and propagated across all telemetry. This UUID becomes the join key across Datadog, storage, processing, and reporting layers.
+- **Offline-friendly IaC**
+- **Repeatable hardening scripts**
+- **Performance-safe JMeter configurations**
+- **Clear operational documentation**
 
-Q: What happens if a test fails halfway?
-A:
-Partial telemetry is still sent to Datadog with the same TEST_UUID, allowing us to analyze failure behavior without losing observability or corrupting downstream datasets.
+---
 
-Datadog Extraction (Raw Logs Export)
+## 🎯 Key Use Cases
 
-This diagram shows the Datadog extraction layer, which is intentionally abstracted from any specific Datadog API.
+- Distributed **JMeter performance testing** (Master / Slave)
+- **Air-gapped or restricted networks**
+- Performance testing environments without external repositories
+- CI/CD pipelines operating in isolated infrastructures
+- Audit-ready and reproducible system setups
 
-The key principle here is that we extract logs in their raw format. No transformations, no aggregations, and no filtering beyond basic correlation metadata.
+---
 
-The extraction mechanism captures the original log structure and persists it into a central object storage. This storage layer acts as the system of record for all observability data.
+## 📦 What This Repository Provides
 
-By introducing this storage boundary, we completely decouple log capture from log processing. This enables replay, reprocessing, auditing, and future tooling changes without impacting upstream systems.
+- OS, JVM and JMeter hardening scripts
+- Deterministic Java memory configuration
+- Safe result handling (no in-memory sample accumulation)
+- Reference architecture and pipeline diagrams
+- Documentation for operational consistency
 
-At this stage, no analytics or business logic is applied.
+---
 
-❓ Likely Questions & Technical Answers
+## 📂 Repository Structure
 
-Q: Why avoid querying Datadog APIs directly?
-A:
-API-based extraction introduces coupling to retention policies, indexing, and query limits. Exporting raw logs ensures durability, replayability, and independence from Datadog’s query layer.
-
-Q: Is this compliant with audit or forensic requirements?
-A:
-Yes. Raw logs are preserved in their original form in object storage, which supports traceability, immutability policies, and long-term retention.
-
-Q: Can this support future tooling changes?
-A:
-Absolutely. Because the raw data is preserved, the processing engine can evolve independently of the extraction mechanism.
-
-
-Python Engine (Data Processing Flow)
-
-This diagram represents the Python Engine, which is the core data processing component.
-
-The engine consumes raw logs from object storage and processes them through a clear, linear flow: extraction, normalization, enrichment, dataset separation, loading, and reporting.
-
-Normalization ensures consistent field names and timestamps. Enrichment adds execution metadata such as run identifiers and test context. The data is then split into logically independent datasets, such as JMeter metrics and service-level metrics.
-
-Only after these steps do we load curated data into PostgreSQL, ensuring idempotency and consistency.
-
-Reporting is treated as a downstream, non-blocking activity and never affects data persistence.
-
-❓ Likely Questions & Technical Answers
-
-Q: Why use a Python engine instead of processing directly in the pipeline?
-A:
-Pipelines are orchestration tools, not data engines. Separating execution from orchestration improves scalability, testability, and operational resilience.
-
-Q: How do you prevent duplicate data inserts?
-A:
-The loader enforces idempotency using TEST_UUID and dataset-level constraints. Reprocessing the same input does not create duplicates.
-
-Q: Can this engine scale or be replaced later?
-A:
-Yes. The engine is stateless and modular. It can later be migrated to Airflow, Spark, or containerized jobs without architectural changes.
-
-
-Pipeline B (Data Orchestration & Reporting)
-
-
-Pipeline B is the data orchestration pipeline. Its role is to coordinate when and how data is processed, not to process the data itself.
-
-It triggers raw data extraction availability, invokes the Python Engine, and validates the completion of each stage.
-
-Once data has been successfully processed and stored, Pipeline B coordinates report generation and notification delivery through email, Slack, or Confluence.
-
-This separation ensures that failures in reporting do not affect data integrity.
-
-❓ Likely Questions & Technical Answers
-
-Q: Why is Pipeline B separate from Pipeline A?
-A:
-Pipeline A handles execution and observability; Pipeline B handles data lifecycle and analytics. This separation reduces blast radius and allows independent scaling and evolution.
-
-Q: What happens if Pipeline B fails?
-A:
-No data is lost. Raw logs remain in storage, and processing can be retried safely due to idempotent design.
-
-Q: Is reporting mandatory for pipeline success?
-A:
-No. Reporting is explicitly decoupled. Data persistence is the success criterion; reporting is a downstream concern.
-
-🧠 Final Tip for Presentation
-
-If you want to close strong, use this sentence:
-
-This architecture cleanly separates execution, observability, extraction, processing, and reporting, ensuring traceability, scalability, and long-term maintainability.
+```text
+iac_offline/
+├── doc/
+│   └── technical_docs.md          # Technical and architectural documentation
+│
+├── pipelines_arch/
+│   └── diagrams/                  # Pipeline and execution architecture diagrams
+│
+├── harden-master.sh               # JMeter MASTER hardening script
+├── harden-slave.sh                # JMeter SLAVE hardening script
+└── README.md                      # Project documentation
