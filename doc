@@ -32,8 +32,8 @@ También es válido como Slave, pero:
 
 ~8 GB RAM — si el script usa mucha memoria, limita la carga.
 
-📌 Si usas HTTP simple → buena capacidad
-📌 Si usas WebSockets / gRPC / mucha extracción JSON o XPath → reduce la carga posible
+📌 HTTP simple → buena capacidad
+📌 WebSockets / gRPC / mucha extracción JSON o XPath → reduce la carga posible
 
 
 Observaciones operativas
