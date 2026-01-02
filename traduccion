@@ -77,8 +77,6 @@ Q: What happens if Pipeline B fails? A: No data is lost. Raw logs remain in stor
 
 Q: Is reporting mandatory for pipeline success? A: No. Reporting is explicitly decoupled. Data persistence is the success criterion; reporting is a downstream concern.
 
-🧠 Final Tip for Presentation
-
-If you want to close strong, use this sentence:
+ Final Tip for Presentation
 
 This architecture cleanly separates execution, observability, extraction, processing, and reporting, ensuring traceability, scalability, and long-term maintainability.
