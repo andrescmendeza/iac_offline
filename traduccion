@@ -1,8 +1,7 @@
 
 
 ┌────────────────┐
-│  main.py       │   ← entry point / logical orchestrator
-│  (Engine Flow) │
+│ (Engine Flow)  │
 └───────┬────────┘
         ▼
 ┌──────────────────────────┐
@@ -16,7 +15,7 @@
 │ transform/normalize      │
 │  - Normalize fields      │
 │  - Standardize names     │
-│  - Adjust timestamps    │
+│  - Adjust timestamps     │
 └───────┬──────────────────┘
         ▼
 ┌──────────────────────────┐
@@ -37,14 +36,14 @@
 │ load/postgres_loader     │
 │  - Bulk insert           │
 │  - Idempotency           │
-│  - Data consistency     │
+│  - Data consistency      │
 └───────┬──────────────────┘
         ▼
 ┌──────────────────────────┐
 │ report/exporters         │
-│  - Report generation    │
-│  - Notifications        │
-│  - Publications         │
+│  - Report generation     │
+│  - Notifications         │
+│  - Publications          │
 └──────────────────────────┘
 
 
@@ -52,7 +51,7 @@ Pipeline b
 
 ┌───────────────────────────────┐
 │        Pipeline B             │
-│   (Azure DevOps Orchestrator) │
+│      (Data Orchestrator)      │
 └───────────────┬───────────────┘
                 │
                 ▼
@@ -84,10 +83,10 @@ Pipeline b
 ┌──────────────────────────────────────────────┐
 │ Stage 3: Loading                             │
 │                                              │
-│ - Bulk insert into Azure PostgreSQL          │
+│ - Bulk insert into PostgreSQL                │
 │   (Flexible Server)                          │
-│ - Ensure schema consistency & constraints   │
-│ - Validate Private Endpoint connectivity    │
+│ - Ensure schema consistency & constraints    │
+│ - Validate Private Endpoint connectivity     │
 └───────────────┬──────────────────────────────┘
                 │
                 ▼
@@ -95,9 +94,9 @@ Pipeline b
 │ Stage 4: Reporting & Notifications           │
 │                                              │
 │ - Generate reports                           │
-│ - Send notifications:                       │
-│     • Slack                                 │
-│     • Email                                 │
+│ - Send notifications:                        │
+│     • Slack                                  │
+│     • Email                                  │
 │ - Export results to Confluence               │
 └──────────────────────────────────────────────┘
 
@@ -105,7 +104,7 @@ Pipeline A
 
 ┌───────────────────────────────┐
 │        Pipeline A             │
-│   (Azure DevOps CI/CD)        │
+│         (CI/CD)               │
 └───────────────┬───────────────┘
                 │
                 ▼
@@ -113,11 +112,11 @@ Pipeline A
 │ Stage 1: Preparation                         │
 │                                              │
 │ - Download JMeter test scripts (.jmx)        │
-│ - Load test configuration                   │
-│   • Threads                                 │
-│   • Duration                                │
-│   • Ramp-up                                 │
-│ - Generate unique TEST_UUID                 │
+│ - Load test configuration                    │
+│   • Threads                                  │
+│   • Duration                                 │
+│   • Ramp-up                                  │
+│ - Generate unique TEST_UUID                  │
 └───────────────┬──────────────────────────────┘
                 │
                 ▼
@@ -137,13 +136,10 @@ Pipeline A
 │ Stage 3: Metrics Forwarding                  │
 │                                              │
 │ - Publish test metrics to Datadog Enterprise │
-│ - Publish service interaction telemetry     │
-│   to Datadog CFS                             │
 │ - Validate tagged data ingestion             │
 └──────────────────────────────────────────────┘
 
 Extraction
-
 
 ┌───────────────────────────────┐
 │        Datadog                │
@@ -156,8 +152,7 @@ Extraction
 │                                              │
 │ - Captures logs in raw format                │
 │ - Preserves original structure               │
-│ - No filtering or transformation             │
-│ - Independent from Datadog APIs              │
+│ - UUID filtering, No transformation          │
 └───────────────┬──────────────────────────────┘
                 │
                 ▼
@@ -165,12 +160,9 @@ Extraction
 │ Central Object Storage                       │
 │                                              │
 │ - Stores raw logs                            │
-│ - Acts as source of truth                   │
+│ - Acts as source of truth                    │
 │ - Supports replay and reprocessing           │
-└───────────────┬──────────────────────────────┘
-                │
-                ▼
-   (Downstream processing – out of scope here)
+└──────────────────────────────────────────────┘
 
 
 
