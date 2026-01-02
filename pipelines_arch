@@ -1,0 +1,165 @@
+
+
+┌────────────────┐
+│ (Engine Flow)  │
+└───────┬────────┘
+        ▼
+┌──────────────────────────┐
+│ extract/                 │
+│  - Data extraction       │
+│  - External source       │
+│  - Raw dataset           │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ transform/normalize      │
+│  - Normalize fields      │
+│  - Standardize names     │
+│  - Adjust timestamps     │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ transform/enrich         │
+│  - Add metadata          │
+│  - run_id / test_id      │
+│  - Enrich tags           │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ transform/split_datasets │
+│  - Split datasets        │
+│    · JMeter metrics      │
+│    · Service metrics     │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ load/postgres_loader     │
+│  - Bulk insert           │
+│  - Idempotency           │
+│  - Data consistency      │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ report/exporters         │
+│  - Report generation     │
+│  - Notifications         │
+│  - Publications          │
+└──────────────────────────┘
+
+
+Pipeline b
+
+┌───────────────────────────────┐
+│        Pipeline B             │
+│      (Data Orchestrator)      │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 1: Datadog Extraction                  │
+│                                              │
+│ - Retrieve JMeter metrics from Datadog       │
+│   • Filter: source:jmeter AND test_uuid      │
+│                                              │
+│ - Retrieve service metrics from Datadog CFS  │
+│   • Exclude JMeter traffic via tags          │
+│                                              │
+│ - Authentication via Azure Key Vault         │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 2: Transformation                      │
+│                                              │
+│ - Normalize column names                     │
+│ - Clean and enrich tags                      │
+│ - Assign run_id and timestamps               │
+│ - Split datasets:                            │
+│     • jmeter_metrics                         │
+│     • service_metrics                        │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 3: Loading                             │
+│                                              │
+│ - Bulk insert into PostgreSQL                │
+│   (Flexible Server)                          │
+│ - Ensure schema consistency & constraints    │
+│ - Validate Private Endpoint connectivity     │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 4: Reporting & Notifications           │
+│                                              │
+│ - Generate reports                           │
+│ - Send notifications:                        │
+│     • Slack                                  │
+│     • Email                                  │
+│ - Export results to Confluence               │
+└──────────────────────────────────────────────┘
+
+Pipeline A
+
+┌───────────────────────────────┐
+│        Pipeline A             │
+│         (CI/CD)               │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 1: Preparation                         │
+│                                              │
+│ - Download JMeter test scripts (.jmx)        │
+│ - Load test configuration                    │
+│   • Threads                                  │
+│   • Duration                                 │
+│   • Ramp-up                                  │
+│ - Generate unique TEST_UUID                  │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 2: Test Execution                      │
+│                                              │
+│ - Run JMeter engine                          │
+│ - Generate real-time KPIs and logs           │
+│ - Apply tags to all telemetry:               │
+│   • test_id (TEST_UUID)                      │
+│   • source:jmeter                            │
+│   • pipeline_run_id                          │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 3: Metrics Forwarding                  │
+│                                              │
+│ - Publish test metrics to Datadog Enterprise │
+│ - Validate tagged data ingestion             │
+└──────────────────────────────────────────────┘
+
+Extraction
+
+┌───────────────────────────────┐
+│        Datadog                │
+│   (Logs generated by tests)   │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Raw Log Extraction Mechanism                 │
+│                                              │
+│ - Captures logs in raw format                │
+│ - Preserves original structure               │
+│ - UUID filtering, No transformation          │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Central Object Storage                       │
+│                                              │
+│ - Stores raw logs                            │
+│ - Acts as source of truth                    │
+│ - Supports replay and reprocessing           │
+└──────────────────────────────────────────────┘
