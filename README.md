@@ -1,5 +1,4 @@
-🟦 SCRIPT 1 — Pipeline A (CI/CD & Test Execution)
-🎙️ Script
+Pipeline A (CI/CD & Test Execution)
 
 This diagram represents Pipeline A, which is our CI/CD execution pipeline.
 Its responsibility is strictly limited to preparing, executing, and tagging performance tests.
@@ -26,8 +25,7 @@ Q: What happens if a test fails halfway?
 A:
 Partial telemetry is still sent to Datadog with the same TEST_UUID, allowing us to analyze failure behavior without losing observability or corrupting downstream datasets.
 
-🟦 SCRIPT 2 — Datadog Extraction (Raw Logs Export)
-🎙️ Script
+Datadog Extraction (Raw Logs Export)
 
 This diagram shows the Datadog extraction layer, which is intentionally abstracted from any specific Datadog API.
 
@@ -53,8 +51,8 @@ Q: Can this support future tooling changes?
 A:
 Absolutely. Because the raw data is preserved, the processing engine can evolve independently of the extraction mechanism.
 
-🟦 SCRIPT 3 — Python Engine (Data Processing Flow)
-🎙️ Script
+
+Python Engine (Data Processing Flow)
 
 This diagram represents the Python Engine, which is the core data processing component.
 
@@ -80,8 +78,9 @@ Q: Can this engine scale or be replaced later?
 A:
 Yes. The engine is stateless and modular. It can later be migrated to Airflow, Spark, or containerized jobs without architectural changes.
 
-🟦 SCRIPT 4 — Pipeline B (Data Orchestration & Reporting)
-🎙️ Script
+
+Pipeline B (Data Orchestration & Reporting)
+
 
 Pipeline B is the data orchestration pipeline. Its role is to coordinate when and how data is processed, not to process the data itself.
 
