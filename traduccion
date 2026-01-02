@@ -1,117 +1,176 @@
-Currently, all configuration activities have been performed manually, which increases the risk of missing specific parameters or steps during replication.
-
-A key constraint is that the machines hosting JMeter, Java, and related components have no internet access. Therefore, it is necessary to maintain a repository of binaries and versions that enable straightforward, consistent installations.
-
-While versioning has been partially implemented, it is recommended to adopt an offline Infrastructure-as-Code (IaC) approach, structuring the repository to reliably manage and deploy all required tools and configurations.
-
-Git Repo
-│
-├─ jmeter/
-│   ├─ bin/                 (offline bundle)
-│   ├─ lib/
-│   ├─ plugins/
-│
-├─ java/
-│   └─ jdk.tar.gz
-│
-├─ config/
-│   ├─ master/
-│   │   └─ jmeter.properties
-│   ├─ slave/
-│   │   └─ jmeter.properties
-│
-├─ scripts/
-│   ├─ install_java.sh
-│   ├─ install_jmeter.sh
-│   ├─ configure_master.sh
-│   ├─ configure_slave.sh
-│   ├─ start_slave.sh
-│   └─ validate_cluster.sh
-│
-└─ pipelines/
-    └─ setup-jmeter.yml
 
 
-IaC / DevOps
-   │
-   ▼
-Git Repo (scripts)
-   │
-   ▼
-Azure DevOps Pipeline: Setup JMeter
-   │
-   ├─ Configure Master
-   │     ├─ Install Java on master
-   │     ├─ Install JMeter on master
-   │     └─ Configure JMeter master
-   │
-   └─ Configure Slaves
-         ├─ Install Java on slave nodes
-         ├─ Install JMeter on slave nodes
-         └─ Configure JMeter slaves
+┌────────────────┐
+│  main.py       │   ← entry point / logical orchestrator
+│  (Engine Flow) │
+└───────┬────────┘
+        ▼
+┌──────────────────────────┐
+│ extract/                 │
+│  - Data extraction       │
+│  - External source       │
+│  - Raw dataset           │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ transform/normalize      │
+│  - Normalize fields      │
+│  - Standardize names     │
+│  - Adjust timestamps    │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ transform/enrich         │
+│  - Add metadata          │
+│  - run_id / test_id      │
+│  - Enrich tags           │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ transform/split_datasets │
+│  - Split datasets        │
+│    · JMeter metrics      │
+│    · Service metrics     │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ load/postgres_loader     │
+│  - Bulk insert           │
+│  - Idempotency           │
+│  - Data consistency     │
+└───────┬──────────────────┘
+        ▼
+┌──────────────────────────┐
+│ report/exporters         │
+│  - Report generation    │
+│  - Notifications        │
+│  - Publications         │
+└──────────────────────────┘
 
 
+Pipeline b
+
+┌───────────────────────────────┐
+│        Pipeline B             │
+│   (Azure DevOps Orchestrator) │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 1: Datadog Extraction                  │
+│                                              │
+│ - Retrieve JMeter metrics from Datadog       │
+│   • Filter: source:jmeter AND test_uuid      │
+│                                              │
+│ - Retrieve service metrics from Datadog CFS  │
+│   • Exclude JMeter traffic via tags          │
+│                                              │
+│ - Authentication via Azure Key Vault         │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 2: Transformation                      │
+│                                              │
+│ - Normalize column names                     │
+│ - Clean and enrich tags                      │
+│ - Assign run_id and timestamps               │
+│ - Split datasets:                            │
+│     • jmeter_metrics                         │
+│     • service_metrics                        │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 3: Loading                             │
+│                                              │
+│ - Bulk insert into Azure PostgreSQL          │
+│   (Flexible Server)                          │
+│ - Ensure schema consistency & constraints   │
+│ - Validate Private Endpoint connectivity    │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 4: Reporting & Notifications           │
+│                                              │
+│ - Generate reports                           │
+│ - Send notifications:                       │
+│     • Slack                                 │
+│     • Email                                 │
+│ - Export results to Confluence               │
+└──────────────────────────────────────────────┘
+
+Pipeline A
+
+┌───────────────────────────────┐
+│        Pipeline A             │
+│   (Azure DevOps CI/CD)        │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 1: Preparation                         │
+│                                              │
+│ - Download JMeter test scripts (.jmx)        │
+│ - Load test configuration                   │
+│   • Threads                                 │
+│   • Duration                                │
+│   • Ramp-up                                 │
+│ - Generate unique TEST_UUID                 │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 2: Test Execution                      │
+│                                              │
+│ - Run JMeter engine                          │
+│ - Generate real-time KPIs and logs           │
+│ - Apply tags to all telemetry:               │
+│   • test_id (TEST_UUID)                      │
+│   • source:jmeter                            │
+│   • pipeline_run_id                          │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Stage 3: Metrics Forwarding                  │
+│                                              │
+│ - Publish test metrics to Datadog Enterprise │
+│ - Publish service interaction telemetry     │
+│   to Datadog CFS                             │
+│ - Validate tagged data ingestion             │
+└──────────────────────────────────────────────┘
+
+Extraction
 
 
-Connectivity / Network Issues
+┌───────────────────────────────┐
+│        Datadog                │
+│   (Logs generated by tests)   │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Raw Log Extraction Mechanism                 │
+│                                              │
+│ - Captures logs in raw format                │
+│ - Preserves original structure               │
+│ - No filtering or transformation             │
+│ - Independent from Datadog APIs              │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────┐
+│ Central Object Storage                       │
+│                                              │
+│ - Stores raw logs                            │
+│ - Acts as source of truth                   │
+│ - Supports replay and reprocessing           │
+└───────────────┬──────────────────────────────┘
+                │
+                ▼
+   (Downstream processing – out of scope here)
 
-JMeter Slave saturated → cannot process requests → Master Timeout
-
-Pipeline execution time does not match the test SLA
-
-RMI Timeouts due to default configuration
-
-Machine Capability Assessment
-
-| Resource | Lab Machine Specs                    | General JMeter Recommendation                  |
-| -------- | ------------------------------------ | ---------------------------------------------- |
-| CPU      | Intel i5-8500T – 6 cores / 6 threads | ✔️ Sufficient for medium-scale load generation |
-| RAM      | 7.6 GB                               | ✔️ Good for GUI Master or low-load Slave       |
-| Disk     | NVMe 218 GB                          | ✔️ Very good, fast and large enough            |
-| Network  | Standard 1 GbE                       | ✔️ Suitable for distributed testing            |
-| OS       | Ubuntu 24.04 LTS                     | ✔️ Fully compatible                            |
-
-JMeter Performance Estimates
-
-| Test Type            | Virtual Users     | Requests/sec      |
-| -------------------- | ----------------- | ----------------- |
-| Simple HTTP          | **1,500 – 3,000** | **200 – 800**     |
-| HTTP with large JSON | **600 – 1,200**   | **80 – 300**      |
-| WebSockets / gRPC    | **300 – 700**     | **<150**          |
-| Selenium             | ❌ 5–20 browsers   | ❌ Not recommended |
-
-
-Upgraded Slave (Memory Only)
-
-| Resource | Upgraded Slave (RAM Only)            | General JMeter Recommendation                              |
-| -------- | ------------------------------------ | ---------------------------------------------------------- |
-| CPU      | Intel i5-8500T – 6 cores / 6 threads | Sufficient for medium-scale distributed load generation |
-| RAM      | **16 GB**                            | Good for higher thread counts and larger JVM heap       |
-| Disk     | NVMe 218 GB                          | Fast and large enough                                   |
-| Network  | Standard 1 GbE                       | Suitable for distributed testing                        |
-| OS       | Ubuntu 24.04 LTS                     | Fully compatible                                        |
-
-
-New “Super Machine” Slave
-
-| Resource | New “Super Machine” Slave   | General JMeter Recommendation                          |
-| -------- | --------------------------- | ------------------------------------------------------ |
-| CPU      | 12 cores / 24 threads       | Ideal for high-scale tests and complex scripts      |
-| RAM      | **32 GB**                   | Great for large heap sizes and thousands of threads |
-| Disk     | NVMe 500 GB                 | Excellent speed and capacity                        |
-| Network  | 1–10 GbE (10 GbE preferred) | Optimal for high-volume distributed testing         |
-| OS       | Ubuntu 24.04 LTS            | Fully compatible                                    |
-
-
-Implement performance configuration optimizations on the JMeter master and slave nodes.
-Run the Azure pipeline directly from the JMeter master server .31 to minimize additional network traffic between the performance test and pipeline execution.
-
-
-
-| Configuration                         | Advantages                                  | Disadvantages                                |
-| ------------------------------------- | ------------------------------------------- | -------------------------------------------- |
-| Master + Slave with increased RAM     | Leverages existing hardware, lower cost     | Still a small distributed environment        |
-| Master + Super Slave                  | Excellent load capacity, future scalability | Higher cost                                  |
-| Single Super Machine (no distributed) | Simplicity, zero Master–Slave latency       | Single point of failure; limited to one host |
 
 
